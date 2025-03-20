@@ -122,88 +122,77 @@ html { direction: rtl; }
     """,
     unsafe_allow_html=True,
 )
+    
 
     st.image("logo.png", caption=" ", use_container_width=True)
 
     # Create tabs for scheduling by event and by location
     tab1, tab2 = st.tabs(["الجدول حسب الايفت", "الجدول حسب موقعك"])
 
-   
-
     with tab1:
-        st.header("اختار نوع الايفنت :")
+        st.header("🎉 وش الفعالية اللي ودك تحضرها؟")
         # Load events data
         try:
             df = pd.read_csv("all_clean_events.csv")
         except FileNotFoundError:
-            st.error("Data file not found. Please ensure 'all_clean_events.csv' exists.")
+            st.error("Data file not found. Please ensure 'all_clean_events-2.csv' exists.")
             st.stop()
         
-        # Define mapping for activity icons
-        activity_icons = {
-            "performence": "5974564_avoid_coronavirus_party_social distancing_icon.png",
-            "music": "353429_music_note_sound_audio_icon.png",
-            "experience": "3790080_experience_information_knowledge_learning_study_icon.png",
-            "activite": "2315961_activity_dance_instructor_sports_icon.png",
-            "Exhibitions and festivals": "811481_fireworks_party_celebration_new year_icon.png",
-            "sport": "4843027_ball_football_game_soccer_sport_icon.png"
+        # Mapping: English activity types to Arabic labels
+        activity_mapping = {
+            "performence": "أداء",                   # performance
+            "music": "موسيقى",                       # music
+            "experience": "تجربة",                   # experience
+            "activite": "نشاط",                      # activite
+            "Exhibitions and festivals": "معارض ومهرجانات",  # Exhibitions and festivals
+            "sport": "رياضة"                         # sport
         }
         
+        # Get unique activity types from the DataFrame.
         unique_activity_types = df["type"].unique().tolist()
-        cols = st.columns(len(unique_activity_types))
-        icons_folder = "icons"
-        for i, activity_type in enumerate(unique_activity_types):
-            with cols[i]:
-                icon_filename = activity_icons.get(activity_type)
-                if icon_filename:
-                    icon_path = os.path.join(icons_folder, icon_filename)
-                    if os.path.exists(icon_path):
-                        with open(icon_path, "rb") as image_file:
-                            encoded_string = base64.b64encode(image_file.read()).decode()
-                        html_string = f"""
-                            <label>
-                                <input type="checkbox" name="{activity_type}" value="{activity_type}" {"checked" if activity_type in st.session_state.selected_activities else ""} style="display: none;">
-                                <img src="data:image/png;base64,{encoded_string}" width="30">
-                                {activity_type}
-                            </label>
-                            <style>
-                            label {{
-                                display: flex;
-                                align-items: center;
-                                margin-bottom: 5px;
-                            }}
-                            label img {{
-                                margin-right: 5px;
-                            }}
-                            </style>
-                        """
-                        is_checked = st.checkbox("", key=f"{activity_type}_check", 
-                                                value=(activity_type in st.session_state.selected_activities),
-                                                label_visibility="hidden")
-                        if is_checked:
-                            st.session_state.selected_activities = list(set(st.session_state.selected_activities) | {activity_type})
-                        else:
-                            st.session_state.selected_activities = [a for a in st.session_state.selected_activities if a != activity_type]
-                        st.markdown(html_string, unsafe_allow_html=True)
-                    else:
-                        st.write(f"Icon not found for {activity_type}")
-                else:
-                    st.write(f"No icon mapping for {activity_type}")
+
+        # Number of columns per row for checkboxes.
+        columns_per_row = 3
+
+        # Initialize selected activities if not in session state.
+        if "selected_activities" not in st.session_state:
+            st.session_state.selected_activities = []
         
+        # Ensure selected_panels is available for recommendations.
+        if "selected_panels" not in st.session_state:
+            st.session_state.selected_panels = set()
+
+        # Create columns for activity checkboxes.
+        cols = st.columns(columns_per_row)
+
+        # Loop through each activity type; show Arabic label.
+        for i, activity_type in enumerate(unique_activity_types):
+            arabic_label = activity_mapping.get(activity_type, activity_type.capitalize())
+            with cols[i % columns_per_row]:
+                is_checked = st.checkbox(
+                    arabic_label, 
+                    key=activity_type, 
+                    value=(activity_type in st.session_state.selected_activities)
+                )
+                if is_checked:
+                    if activity_type not in st.session_state.selected_activities:
+                        st.session_state.selected_activities.append(activity_type)
+                else:
+                    st.session_state.selected_activities = [
+                        a for a in st.session_state.selected_activities if a != activity_type
+                    ]
+
+        # -----------------------------
         # Event selection and map display
+        # -----------------------------
         if st.session_state.selected_activities:
-            st.write("Selected Activities:", ", ".join(st.session_state.selected_activities))
             filtered_df = df[df["type"].isin(st.session_state.selected_activities)]
             event_names = list(filtered_df["names"].unique())
             if event_names:
-                # Prepend an empty option to force explicit selection.
-                selected_event = st.selectbox("Select an Event:", ["-- Choose an event --"] + event_names, key="selected_event")
-                if selected_event != "-- Choose an event --":
-                    st.write(f"Selected Event: **{selected_event}**")
+                selected_event = st.selectbox(" ", ["-- اختار الفعالية --"] + event_names, key="selected_event")
+                if selected_event != "-- اختار الفعالية --":
                     selected_event_df = filtered_df[filtered_df["names"] == selected_event]
                     if not selected_event_df.empty:
-                        event_desc = selected_event_df["description"].iloc[0]
-                        st.radio("Choose a description:", [event_desc])
                         event_details = selected_event_df.iloc[0]
                     else:
                         event_details = {}
@@ -213,7 +202,6 @@ html { direction: rtl; }
                 st.write("No events available for the selected activity types.")
                 event_details = {}
             
-            # Only display details and map if event_details is a nonempty Series
             if isinstance(event_details, pd.Series) and not event_details.empty:
                 st.markdown(
                     f"""
@@ -228,12 +216,13 @@ html { direction: rtl; }
                 )
                 if "Latitude" in event_details and "Longitude" in event_details:
                     user_location = {"lat": event_details["Latitude"], "lon": event_details["Longitude"]}
+                    # Build the map later using the slider radius stored in st.session_state.
                     event_map = folium.Map(location=[user_location["lat"], user_location["lon"]], zoom_start=14)
-                    radius_val = st.session_state.slider_radius if "slider_radius" in st.session_state else 3
+                    # Use st.session_state.radius_km once set below.
                     folium.Circle(
                         location=[user_location["lat"], user_location["lon"]],
-                        radius=radius_val * 1000,
-                        color="red",
+                        radius=st.session_state.radius_km * 1000,
+                        color="blue",
                         fill=True,
                         fill_opacity=0.2
                     ).add_to(event_map)
@@ -242,86 +231,91 @@ html { direction: rtl; }
                 else:
                     st.write("Event location not available.")
             else:
-                st.write("Please choose an event from the list.")
+                st.write("⚠️ لازم تختار فعالية في الأول")
         else:
-            st.write("Please select at least one activity type.")
+            st.write("⚠️ لازم تختار على الاقل فعالية واحدة")
         
-        # Recommendations Options
-        slider_cols = st.columns([1, 3])
-        with slider_cols[0]:
-            rec_radius = st.slider("نصف القطر للتوصيات (كم):", 1, 15, 3, step=1, key="slider_radius")
-        with slider_cols[1]:
-            st.markdown("<p style='text-align:right;'>حدد نصف القطر للتوصيات:</p>", unsafe_allow_html=True)
-        st.write(f"المسافة المختارة للتوصيات: {rec_radius} كم")
+        st.write("##### 🗓️ يلا نسوي جدولك")
+        st.markdown("<h1 style='font-size: 24px;'>🚗قد ايش ودك تبعد عن الفعالية؟:</h1>", unsafe_allow_html=True)
+
+        max_radius = 5.0
+        min_radius = 1.0
+        # Compute slider value and store radius_km in session state.
+        reversed_slider_value = st.slider(
+            " ",
+            0.0,
+            max_radius - min_radius,
+            max_radius - 1.0,
+            0.5,
+            key="unique_slider_key"
+        )
+        radius_km = max_radius - reversed_slider_value
+        st.session_state.radius_km = radius_km  # Store for later use
+        st.write(f"بندَور لك اماكن داخل هذه النطاق ({radius_km} km )")
         
-        st.write("### اختر الفئات الإضافية:")
-        panel_cols = st.columns(4)
-        mall_checked = st.checkbox("Mall", key="mall_checkbox")
-        if mall_checked:
-            st.session_state.selected_panels.add("Mall")
-        else:
-            st.session_state.selected_panels.discard("Mall")
-        
-        coffee_checked = st.checkbox("Coffee", key="coffee_checkbox")
-        if coffee_checked:
-            st.session_state.selected_panels.add("Coffee")
-        else:
-            st.session_state.selected_panels.discard("Coffee")
-        
-        restaurant_checked = st.checkbox("Restaurant", key="restaurant_checkbox")
-        if restaurant_checked:
-            st.session_state.selected_panels.add("Restaurant")
-        else:
-            st.session_state.selected_panels.discard("Restaurant")
-        
-        cinema_checked = st.checkbox("Cinema", key="cinema_checkbox")
-        if cinema_checked:
-            st.session_state.selected_panels.add("Cinema")
-        else:
-            st.session_state.selected_panels.discard("Cinema")
-        
-        # Venue Options: Automatically set based on panels
+        st.write("#### وين ودك تروح بعد الفعالية؟:")
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            mall_checked = st.checkbox("تبي تروح تتسوق؟", key="rec2_mall_checkbox_unique")
+            if mall_checked:
+                st.session_state.selected_panels.add("Mall")
+            else:
+                st.session_state.selected_panels.discard("Mall")
+        with col2:
+            coffee_checked = st.checkbox("تبي تروح تتقهوى؟", key="rec2_coffee_checkbox_unique")
+            if coffee_checked:
+                st.session_state.selected_panels.add("Coffee")
+            else:
+                st.session_state.selected_panels.discard("Coffee")
+        with col3:
+            restaurant_checked = st.checkbox("تبي تروح تاكل؟", key="rec2_restaurant_checkbox_unique")
+            if restaurant_checked:
+                st.session_state.selected_panels.add("Restaurant")
+            else:
+                st.session_state.selected_panels.discard("Restaurant")
+        with col4:
+            cinema_checked = st.checkbox("تبي تشوف موڤي؟", key="rec2_cinema_checkbox_unique")
+            if cinema_checked:
+                st.session_state.selected_panels.add("Cinema")
+            else:
+                st.session_state.selected_panels.discard("Cinema")
+
+        # Venue categories based on selected panels.
         venue_categories = []
         if "Mall" in st.session_state.selected_panels or "Cinema" in st.session_state.selected_panels:
-            st.markdown("**🏬 Venue Options**")
             if "Mall" in st.session_state.selected_panels and "Cinema" not in st.session_state.selected_panels:
                 venue_categories = ["Shopping Mall"]
-                st.write("Automatically selected: Shopping Mall")
+                st.write("المولات")
             elif "Cinema" in st.session_state.selected_panels and "Mall" not in st.session_state.selected_panels:
-                venue_categories = ["Movie Theater"]
-                st.write("Automatically selected: Movie Theater")
+                st.write("سينما")
             elif "Mall" in st.session_state.selected_panels and "Cinema" in st.session_state.selected_panels:
                 venue_categories = ["Shopping Mall", "Movie Theater"]
-                st.write("Automatically selected: Shopping Mall and Movie Theater")
+                st.write("مولات وسينما")
         else:
             venue_categories = []
-        
+
+        # Always define radio button labels for coffee and restaurant preferences.
         if "Coffee" in st.session_state.selected_panels:
-            st.markdown("**☕ Coffee Options**")
-            st.radio("اختر:", ['hidden_gem', 'hot_spot'], key="coffee_pref")
+            st.write('مقاهي')
+            coffee_pref_label = st.radio(" ", ['تقيمه عالي لكن مو ترند', 'يكون ترند'], key="rec2_coffee_pref_unique")
         else:
-            if "coffee_pref" in st.session_state:
-                st.session_state.pop("coffee_pref")
-        
+            coffee_pref_label = 'تقيمه عالي لكن مو ترند'
+            
         if "Restaurant" in st.session_state.selected_panels:
-            st.markdown("**🍽️ Restaurant Options**")
             try:
                 df_rest = pd.read_csv("cleaned_restaurant.csv")
             except Exception as e:
                 st.error(f"Error loading restaurant data: {e}")
                 df_rest = pd.DataFrame()
             all_restaurant_categories = sorted(df_rest['Category'].dropna().unique()) if not df_rest.empty else []
-            st.multiselect("اختر فئات المطاعم:", options=all_restaurant_categories, key="restaurant_categories")
-            st.radio("اختر:", ['hidden_gem', 'hot_spot'], key="restaurant_pref")
+            st.write('مطاعم')
+            restaurant_categories = st.multiselect(" ", options=all_restaurant_categories, key="rec2_restaurant_categories_unique")
+            restaurant_pref_label = st.radio(" ", ['تقيمه عالي لكن مو ترند', 'يكون ترند'], key="rec2_restaurant_pref_unique")
         else:
-            if "restaurant_categories" in st.session_state:
-                st.session_state.pop("restaurant_categories")
-            if "restaurant_pref" in st.session_state:
-                st.session_state.pop("restaurant_pref")
+            restaurant_pref_label = 'تقيمه عالي لكن مو ترند'
         
-        col1, col2, col3 = st.columns(3)
-
-        # Radio button choices in the same row
+        # Radio button for sorting (using a unique key)
         with col1:
             similarity_score = 'ابهرني'
         with col2:
@@ -329,24 +323,28 @@ html { direction: rtl; }
         with col3:
             distance_button1 = 'الاقل مسافه'
 
-        # Combine the choices into one single radio button
         sort_by = st.radio(
             '',
             options=[similarity_score, rating_button1, distance_button1],
-            index=0,  # Default to the first one
-            key="rec2_sort_by",
+            index=0,
+            key="rec2_sort_by_unique",
             label_visibility="collapsed"
         )
-
-        # Mapping the chosen option to the corresponding sorting logic
         if sort_by == similarity_score:
-            sort_by = 'similarity_score'
+            sort_by_internal = 'similarity_score'
         elif sort_by == rating_button1:
-            sort_by = 'Rating'
+            sort_by_internal = 'Rating'
         elif sort_by == distance_button1:
-            sort_by = 'distance_km'
-        # Button to trigger fresh recommendations
-        if st.button("Get Recommendations"):
+            sort_by_internal = 'distance_km'
+        
+        # Convert radio button selections for preferences into internal codes.
+        coffee_preference = "hidden_gem" if coffee_pref_label == 'تقيمه عالي لكن مو ترند' else "trending"
+        restaurant_preference = "hidden_gem" if restaurant_pref_label == 'تقيمه عالي لكن مو ترند' else "trending"
+        
+        # -----------------------------
+        # Recommendation logic
+        # -----------------------------
+        if st.button("اقتراحاتنا لك"):
             def haversine_distance(lat1, lon1, lat2, lon2):
                 lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
                 dlat = lat2 - lat1
@@ -358,7 +356,7 @@ html { direction: rtl; }
             def min_max_scale(series):
                 diff = series.max() - series.min()
                 if diff == 0:
-                    return pd.Series([1]*len(series), index=series.index)
+                    return pd.Series([1] * len(series), index=series.index)
                 return (series - series.min()) / diff
 
             def weighted_cosine_similarity(u, v, weights, eps=1e-8):
@@ -421,7 +419,7 @@ html { direction: rtl; }
                 if df.empty:
                     st.write(f"No restaurants within {radius} km.")
                     return None
-                df['distance_score'] = df['distance_km'].apply(lambda d: max(0, 1 - ((d if d>=2 else 2) / radius)))
+                df['distance_score'] = df['distance_km'].apply(lambda d: max(0, 1 - ((d if d >= 2 else 2) / radius)))
                 for col in ['Rating','Total Ratings','Popularity Score','Total Photos','Total Tips']:
                     df[col] = df[col].fillna(0)
                 df['norm_rating'] = df['Rating'] / 5.0
@@ -449,7 +447,7 @@ html { direction: rtl; }
                 else:
                     df = df.sort_values(by='similarity_score', ascending=False).head(10)
                 return df
-            
+
             def get_venue_recommendations(df_venue, user_location, radius, chosen_categories):
                 df = df_venue.copy()
                 if chosen_categories:
@@ -467,22 +465,23 @@ html { direction: rtl; }
                 df['similarity_score'] = 0.4 * df['distance_score']
                 df = df.sort_values(by='similarity_score', ascending=False).head(10)
                 return df
-        # Create a combined map for all recommendations
+
+            # Build the map using event location and the computed radius.
             event_map = folium.Map(location=[user_location["lat"], user_location["lon"]], zoom_start=14)
-
-            # Event details and location
-            if "Latitude" in event_details and "Longitude" in event_details:
-                user_location = {"lat": event_details["Latitude"], "lon": event_details["Longitude"]}
-
-                # Event location on the map
-                folium.Marker(
-                    location=[user_location["lat"], user_location["lon"]],
-                    popup=f"Event: {event_details['names']}",
-                    icon=folium.Icon(color="blue", icon="info-sign")
-                ).add_to(event_map)
-
-         
-            # Add Coffee recommendations to the map
+            folium.Circle(
+                location=[user_location["lat"], user_location["lon"]],
+                radius=st.session_state.radius_km * 1000,
+                color="blue",
+                fill=True,
+                fill_opacity=0.2
+            ).add_to(event_map)
+            folium.Marker(
+                location=[user_location["lat"], user_location["lon"]],
+                popup=f"Event: {event_details['names']}",
+                icon=folium.Icon(color="blue", icon="info-sign")
+            ).add_to(event_map)
+            
+            # Coffee recommendations
             if "Coffee" in st.session_state.selected_panels:
                 st.markdown("**توصيات Coffee**")
                 try:
@@ -490,10 +489,9 @@ html { direction: rtl; }
                 except Exception as e:
                     st.error(f"Error loading coffee data: {e}")
                     df_coffee = pd.DataFrame()
-
                 if not df_coffee.empty:
-                    rec_coffee = get_coffee_recommendations(df_coffee, user_location, rec_radius, 
-                                                            st.session_state.get("coffee_pref", "hidden_gem"), sort_by)
+                    rec_coffee = get_coffee_recommendations(df_coffee, user_location, st.session_state.radius_km, 
+                                                            coffee_preference, sort_by_internal)
                     if rec_coffee is not None:
                         for _, row in rec_coffee.iterrows():
                             folium.Marker(
@@ -501,7 +499,6 @@ html { direction: rtl; }
                                 popup=f"Coffee: {row['Name']}<br>Rating: {row['Rating']}<br>Distance: {row['distance_km']} km",
                                 icon=folium.Icon(color="green", icon="coffee", prefix="fa")
                             ).add_to(event_map)
-
                             st.markdown(f"""
                             <div style="border:1px solid #ccc; padding:10px; border-radius:5px; margin-bottom:10px;">
                                 <h4>{row['Name']}</h4>
@@ -511,7 +508,7 @@ html { direction: rtl; }
                             </div>
                             """, unsafe_allow_html=True)
 
-            # Add Restaurant recommendations to the map
+            # Restaurant recommendations
             if "Restaurant" in st.session_state.selected_panels:
                 st.markdown("**توصيات Restaurant**")
                 try:
@@ -519,11 +516,10 @@ html { direction: rtl; }
                 except Exception as e:
                     st.error(f"Error loading restaurant data: {e}")
                     df_rest = pd.DataFrame()
-
                 if not df_rest.empty:
                     chosen_rest_categories = st.session_state.get("restaurant_categories", [])
-                    rec_rest = get_restaurant_recommendations(df_rest, user_location, rec_radius, 
-                                                            chosen_rest_categories, st.session_state.get("restaurant_pref", "hidden_gem"), sort_by)
+                    rec_rest = get_restaurant_recommendations(df_rest, user_location, st.session_state.radius_km, 
+                                                            chosen_rest_categories, restaurant_preference, sort_by_internal)
                     if rec_rest is not None:
                         for _, row in rec_rest.iterrows():
                             folium.Marker(
@@ -531,7 +527,6 @@ html { direction: rtl; }
                                 popup=f"Restaurant: {row['Name']}<br>Category: {row['Category']}<br>Rating: {row['Rating']}",
                                 icon=folium.Icon(color="red", icon="cutlery", prefix="fa")
                             ).add_to(event_map)
-
                             st.markdown(f"""
                             <div style="border:1px solid #ccc; padding:10px; border-radius:5px; margin-bottom:10px;">
                                 <h4>{row['Name']}</h4>
@@ -541,20 +536,18 @@ html { direction: rtl; }
                             </div>
                             """, unsafe_allow_html=True)
 
-            # Add Venue recommendations to the map
-            if("Mall" in st.session_state.selected_panels or "Cinema" in st.session_state.selected_panels):
+            # Venue recommendations
+            if "Mall" in st.session_state.selected_panels or "Cinema" in st.session_state.selected_panels:
                 st.markdown("**توصيات Venue**")
                 try:
                     df_venue = pd.read_csv("cleaned_venues.csv")
                 except Exception as e:
                     st.error(f"Error loading venue data: {e}")
                     df_venue = pd.DataFrame()
-
                 if not df_venue.empty:
-                    rec_venue = get_venue_recommendations(df_venue, user_location, rec_radius, venue_categories)
+                    rec_venue = get_venue_recommendations(df_venue, user_location, st.session_state.radius_km, venue_categories)
                     if rec_venue is not None:
                         for _, row in rec_venue.iterrows():
-                            # Check the category to select the appropriate icon
                             if row['Category'] in ["Shopping Mall"]:
                                 icon = folium.Icon(color="blue", icon="shopping-bag", prefix="fa")
                             elif row['Category'] in ["Movie Theater"]:
@@ -566,7 +559,6 @@ html { direction: rtl; }
                                 popup=f"Venue: {row['Name']}<br>Category: {row['Category']}<br>Distance: {row['distance_km']} km",
                                 icon=icon
                             ).add_to(event_map)
-
                             st.markdown(f"""
                             <div style="border:1px solid #ccc; padding:10px; border-radius:5px; margin-bottom:10px;">
                                 <h4>{row['Name']}</h4>
@@ -575,8 +567,7 @@ html { direction: rtl; }
                             </div>
                             """, unsafe_allow_html=True)
 
-            # Display the combined map with all markers
-            st.write("### جميع التوصيات على الخريطة")
+            st.write("### كيف زبطناك؟ 😎")
             folium_static(event_map, width=700, height=500)
 
 
@@ -585,8 +576,9 @@ html { direction: rtl; }
 
 
     with tab2:
-        st.title("انت في اي حي؟ 📍")
+        st.markdown("<h1 style='font-size: 24px;'>📍 انت في اي حي؟</h1>", unsafe_allow_html=True)
 
+        # Full list of Riyadh neighborhoods (name, latitude, longitude)
         riyadh_neighborhoods = [
         ("الصحافة", 24.803329, 46.639133),
         ("الربيع", 24.795393, 46.658502),
@@ -684,7 +676,7 @@ html { direction: rtl; }
 
             # Use one slider for the interactive map circle radius (this same radius is also used for recommendations)
             #radius_km = st.slider("Radius (km):", 1.0, 5.0, 1.0, 0.5)
-            st.title("🚗 حدد لي اننطاق الي حاب ادور فيه")
+            st.markdown("<h1 style='font-size: 24px;'>🚗 حدد لي النطاق الي حاب ادور فيه:</h1>", unsafe_allow_html=True)
 
             max_radius = 5.0
             min_radius = 1.0
@@ -713,7 +705,7 @@ html { direction: rtl; }
             # Calculate the actual radius
             radius_km = max_radius - reversed_slider_value
 
-            st.write(f":حدور لك اماكن داخل هذه النطاق {radius_km} km")
+            st.write(f"بندَور لك اماكن داخل هذه النطاق ({radius_km} km )")
             def create_map(lat, lon):
                 m = folium.Map(location=[lat, lon], zoom_start=14)
                 folium.Marker(location=[lat, lon],
@@ -726,7 +718,7 @@ html { direction: rtl; }
                             fill_color="blue",
                             fill_opacity=0.2).add_to(m)
                 return m
-            st.title("حاب نكمل ندور لك عن اماكن بنفس الحي اللي اخترتة! ولا ودك تعدل موقعك؟ ")
+            st.markdown("<h1 style='font-size: 24px;'>حاب نكمل ندور لك عن اماكن بنفس الحي اللي اخترتة! ولا ودك تعدل موقعك؟</h1>", unsafe_allow_html=True)
 
             map_placeholder = st.empty()
             m = create_map(st.session_state.lat, st.session_state.lon)
@@ -753,41 +745,42 @@ html { direction: rtl; }
         user_location = {"lat": st.session_state.lat, "lon": st.session_state.lon}
 
         
-        st.title("🗓️ يلا نسوي جدولك")
+        
+        st.write("##### 🗓️ يلا نسوي جدولك")
         
      
 
         if 'selected_panels' not in st.session_state:
             st.session_state.selected_panels = set()
 
-        st.write("### 🚗 وين ودك تروح بعد الفعالية؟")
+        st.write("##### 🚗 وين ودك تروح؟")
 
 
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            mall_checked = st.checkbox("Mall", key="rec2_mall_checkbox")
+            mall_checked = st.checkbox("تبي تروح تتسوق؟", key="rec2_mall_checkbox")
             if mall_checked:
                 st.session_state.selected_panels.add("Mall")
             else:
                 st.session_state.selected_panels.discard("Mall")
 
         with col2:
-            coffee_checked = st.checkbox("Coffee", key="rec2_coffee_checkbox")
+            coffee_checked = st.checkbox("تبي تروح تتقهوى؟", key="rec2_coffee_checkbox")
             if coffee_checked:
                 st.session_state.selected_panels.add("Coffee")
             else:
                 st.session_state.selected_panels.discard("Coffee")
 
         with col3:
-            restaurant_checked = st.checkbox("Restaurant", key="rec2_restaurant_checkbox")
+            restaurant_checked = st.checkbox("تبي تروح تاكل؟", key="rec2_restaurant_checkbox")
             if restaurant_checked:
                 st.session_state.selected_panels.add("Restaurant")
             else:
                 st.session_state.selected_panels.discard("Restaurant")
 
         with col4:
-            cinema_checked = st.checkbox("Cinema", key="rec2_cinema_checkbox")
+            cinema_checked = st.checkbox("تبي تشوف موڤي؟", key="rec2_cinema_checkbox")
             if cinema_checked:
                 st.session_state.selected_panels.add("Cinema")
             else:
@@ -796,41 +789,38 @@ html { direction: rtl; }
         # Continue with your existing logic for displaying recommendations based on selected panels
         venue_categories = []
         if "Mall" in st.session_state.selected_panels or "Cinema" in st.session_state.selected_panels:
-            st.markdown("**🏬 Venue Options**")
+            #st.markdown("**🏬 Venue Options**")
             if "Mall" in st.session_state.selected_panels and "Cinema" not in st.session_state.selected_panels:
                 venue_categories = ["Shopping Mall"]
-                st.write("Automatically selected: Shopping Mall")
+                st.write("المولات")
             elif "Cinema" in st.session_state.selected_panels and "Mall" not in st.session_state.selected_panels:
-                venue_categories = ["Movie Theater"]
-                st.write("Automatically selected: Movie Theater")
+                #venue_categories = ["Movie Theater"]
+                st.write("سينما")
             elif "Mall" in st.session_state.selected_panels and "Cinema" in st.session_state.selected_panels:
                 venue_categories = ["Shopping Mall", "Movie Theater"]
-                st.write("Automatically selected: Shopping Mall and Movie Theater")
+                st.write("مولات وسينما")
 
         else:
             venue_categories = []
 
         if "Coffee" in st.session_state.selected_panels:
-            st.markdown("**☕ Coffee Options**")
-            coffee_pref = st.radio("اختر:", ['hidden_gem', 'hot_spot'], key="rec2_coffee_pref")
+            st.markdown("**☕ ايش تفضل في المقاهي؟**")
+            coffee_pref = st.radio(" ", ['تقيمه عالي لكن مو ترند', 'يكون ترند'], key="rec2_coffee_pref")
 
         if "Restaurant" in st.session_state.selected_panels:
-            st.markdown("**🍽️ Restaurant Options**")
+            st.markdown("**🍽️ ايش تفضل في المطاعم**")
             try:
                 df_rest = pd.read_csv("cleaned_restaurant.csv")
             except Exception as e:
                 st.error(f"Error loading restaurant data: {e}")
                 df_rest = pd.DataFrame()
             all_restaurant_categories = sorted(df_rest['Category'].dropna().unique()) if not df_rest.empty else []
-            restaurant_categories = st.multiselect("اختر فئات المطاعم:", options=all_restaurant_categories, key="rec2_restaurant_categories")
-            restaurant_pref = st.radio("اختر:", ['hidden_gem', 'hot_spot'], key="rec2_restaurant_pref")
+            restaurant_categories = st.multiselect(" ", options=all_restaurant_categories, key="rec2_restaurant_categories")
+            restaurant_pref = st.radio(" ", ['تقيمه عالي لكن مو ترند', 'يكون ترند'], key="rec2_restaurant_pref")
 
 
-        st.write("### ⭐ ايش اكثر شي يهمك في المكان اللي ودك فية:")
+        st.write("##### ⭐ ايش اكثر شي يهمك في المكان اللي ودك فية:")
 
-        # Create columns to simulate buttons in the same row
-         # Radio buttons for sorting
-        # Create columns to simulate radio buttons next to each other
         col1, col2, col3 = st.columns(3)
 
         # Radio button choices in the same row
@@ -846,12 +836,12 @@ html { direction: rtl; }
             '',
             options=[similarity_score_button, rating_button, distance_button],
             index=0,  # Default to the first one
-            key="rec_sort_by",
+            key="rec1_sort_by",
             label_visibility="collapsed"
         )
 
-      
-        # Default sorting to 'similarity_score'
+
+# Default sorting to 'similarity_score'
         sort_by = 'similarity_score'
 
         # Update the sorting based on the button clicked
@@ -861,6 +851,7 @@ html { direction: rtl; }
             sort_by = 'Rating'
         elif distance_button:
             sort_by = 'distance_km'
+
 
         if st.button("اقتراحاتنا لك", key="rec2_get_recommendations"):
 
@@ -1094,9 +1085,7 @@ html { direction: rtl; }
                             </div>
                             """, unsafe_allow_html=True)
 
-            st.write("### موقع الحي مع توصيات الأماكن")
+            st.write("### كيف زبطناك؟ 😎")
             folium_static(combined_map, width=700, height=500)
-
-
 if __name__ == "__main__":
     main()
