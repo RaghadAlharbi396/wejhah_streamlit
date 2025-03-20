@@ -124,7 +124,7 @@ html { direction: rtl; }
 )
     
 
-    st.image("logo.png", caption=" ", use_container_width=True)
+    st.image("logo.png", caption=" ", width=250)
 
     # Create tabs for scheduling by event and by location
     tab1, tab2 = st.tabs(["الجدول حسب الايفت", "الجدول حسب موقعك"])
