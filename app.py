@@ -314,7 +314,7 @@ html { direction: rtl; }
             restaurant_pref_label = st.radio(" ", ['تقيمه عالي لكن مو ترند', 'يكون ترند'], key="rec2_restaurant_pref_unique")
         else:
             restaurant_pref_label = 'تقيمه عالي لكن مو ترند'
-        
+        st.write("##### ⭐ ايش اكثر شي يهمك في المكان اللي ودك فية:")
         # Radio button for sorting (using a unique key)
         with col1:
             similarity_score = 'ابهرني'
